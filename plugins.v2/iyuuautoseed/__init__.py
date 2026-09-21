@@ -1298,6 +1298,28 @@ class IYUUAutoSeed(_PluginBase):
             """
             return True if "greatposterwall." in url else False
         
+
+        def __is_hddolby(url: str):
+            """
+            判断是否为HDDolby站点
+            """
+            return "hddolby.com" in (url or "").lower()
+
+        def __get_hddolby_torrent_url(tid: str, token: str):
+            """
+            使用HDDolby站点配置中的token作为downhash生成种子下载链接
+            """
+            if not tid:
+                logger.error("HDDolby种子ID为空")
+                return None
+            if not token:
+                logger.error("HDDolby站点的token未配置,请于站点配置中的 API->请求头 配置")
+                return None
+            return urljoin(
+                site.get("url"),
+                f"download.php?id={tid}&downhash={token}"
+            )
+
         def __get_mteam_enclosure(tid: str, apikey: str):
             """
             获取mteam种子下载链接
@@ -1429,6 +1451,13 @@ class IYUUAutoSeed(_PluginBase):
                 # 从详情页面获取下载链接
                 return __get_gpw_torrent_url_from_page(seed=seed, site=site)
             
+            if __is_hddolby(site.get('url')):
+                # HDDolby使用站点token作为downhash直接生成下载链接，
+                # 不使用IYUU返回的旧模板，也不访问种子详情页。
+                return __get_hddolby_torrent_url(
+                    tid=seed.get("torrent_id"),
+                    token=site.get("token")
+                )
             elif __is_special_site(site.get('url')):
                 # 从详情页面获取下载链接
                 return self.__get_torrent_url_from_page(seed=seed, site=site)
