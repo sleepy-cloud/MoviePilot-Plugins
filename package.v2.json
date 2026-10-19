@@ -840,12 +840,13 @@
     "name": "动态企微可信IP",
     "description": "修改企微应用可信IP，支持Srever酱等第三方通知。验证码以？结尾发送到企业微信应用",
     "labels": "消息通知",
-    "version": "2.1.8",
+    "version": "2.1.9",
     "icon": "Wecom_A.png",
     "author": "RamenRa",
     "level": 2,
     "system_version": ">=2.12.0",
     "history": {
+      "v2.1.9": "fix:修复github@samsshid的issues#53带前导点匹配失败。优化cookie校验的逻辑",
       "v2.1.8": "fix:修复github@318182456指出的问题。校验cookie出现的not enough values to unpack (expected 2, got 1)。错误。",
       "v2.1.7": "修复多线程环境下的任务管理及cookie误报等问题，提升稳定性",
       "v2.1.6-1": "修复并发安全与资源管理问题",
@@ -969,7 +970,7 @@
     "name": "OIDC 认证",
     "description": "通过 OpenID Connect Provider 为 MoviePilot 提供插件化登录与账号绑定。",
     "labels": "认证,OIDC,SSO",
-    "version": "0.3.4",
+    "version": "0.3.5",
     "icon": "Oidcauth_A.png",
     "author": "ui-beam-9,jxxghp",
     "level": 1,
@@ -982,7 +983,8 @@
       "v0.3.1": "修复回调事件类型不匹配导致前端错误提示不准确；移除解绑方法多余检查，允许 OIDC 关闭状态下正常解绑。",
       "v0.3.2": "兼容 MoviePilot v2.15.3 认证模块路径调整，修复插件无法加载的问题，同时保留对旧版认证模块的支持。",
       "v0.3.3": "强化新版认证模块优先、旧版认证模块兜底的加载逻辑，并发布新版本确保旧安装可收到升级。",
-      "v0.3.4": "修复 MoviePilot V3 中 OIDC 登录、绑定及按用户名自动绑定时使用旧数据库调用导致回调崩溃的问题，并保留 V2 兼容。"
+      "v0.3.4": "修复 MoviePilot V3 中 OIDC 登录、绑定及按用户名自动绑定时使用旧数据库调用导致回调崩溃的问题，并保留 V2 兼容。",
+      "v0.3.5": "新增默认关闭的使用代理开关，修复全局代理导致内网 OIDC Provider 登录和绑定失败的问题。"
     }
   },
   "AgentTokens": {
@@ -1519,5 +1521,19 @@
       "v2.0.1": "不值一提",
       "v2.0.0": "不值一提"
     }
-  }
+  },
+  "BrushDigest": {
+      "name": "刷流汇总",
+      "description": "把站点刷流的新增/删除汇总成一条通知，替代每个种子一条的逐条推送。支持自定义汇总周期、立即推送一次、自动检测数据来源插件。",
+      "labels": "站点,刷流,通知",
+      "version": "1.1.0",
+      "icon": "https://raw.githubusercontent.com/IceNoproblem/MoviePilot-Plugins/main/icons/brushdigest.png",
+      "author": "icenoproblem",
+      "level": 1,
+      "release": true,
+      "history": {
+        "v1.1.0": "新增「立即汇总推送一次」；数据来源改为自动检测的下拉框；内置配置说明与原插件通知开关指引",
+        "v1.0.0": "首个版本，按周期把刷流插件的新增/删除汇总成一条通知"
+      }
+    }
 }
