@@ -1,13 +1,22 @@
 name: Sync Upstream
 
 # 自动同步上游 jxxghp/MoviePilot-Plugins 的更新到本 fork。
-# 策略：fetch upstream -> 尝试 merge。
-#   - 干净 merge：自动 push 到 main（用默认 GITHUB_TOKEN 即可）。
-#   - 有冲突：推送 sync-upstream 分支，并用 SYNC_TOKEN(PAT) 自动开 PR 供人工解决。
-#             若未配置 SYNC_TOKEN，则因 GITHUB_TOKEN 无法创建 PR，改为报错并给出手动开 PR 的链接。
+# 策略：fetch upstream -> 把本 fork 的自有提交 rebase 到 upstream/main 之上 -> force-with-lease 推送。
+#   - 历史保持线性，不再产生 "Merge remote-tracking branch 'upstream/main'" 提交；
+#     本 fork 相对 upstream 永远只多自己的提交（当前仅 1 个：iyuuautoseed HDDolby 辅种）。
+#   - 干净 rebase：自动 force-with-lease push 到 main。
+#   - 有冲突：推送 sync-upstream 分支（= upstream/main），并用 SYNC_TOKEN(PAT) 自动开 PR 供人工解决；
+#             合并该 PR 时请选 "Rebase and merge"，避免重新引入 Merge 提交。
 #
-# 启用冲突自动开 PR：在 仓库 Settings > Secrets and variables > Actions 添加
-#   SYNC_TOKEN = 一个 Personal Access Token（classic 需 repo 权限，或 fine-grained 授予本仓库 contents:write、pull-requests:write）。
+# 必须配置 SYNC_TOKEN，否则同步必然在 push 阶段失败：
+#   默认 GITHUB_TOKEN 是 GitHub App 身份，没有 workflows 权限；
+#   只要上游改动包含 .github/workflows/ 下的文件，push 就会被远程拒绝：
+#     "refusing to allow a GitHub App to create or update workflow ... without `workflows` permission"
+#   这正是 2026-10-30 之后每日同步失败的原因（上游改了 plugin-gate.yml）。
+#
+# 配置方法：先建 PAT（细粒度：仅本仓库，Contents 读写 + Workflows 读写 + Pull requests 读写；
+#   或经典 PAT 勾 repo + workflow），再到仓库 Settings > Secrets and variables > Actions 添加
+#   SYNC_TOKEN=<该 PAT>
 
 on:
   schedule:
@@ -28,6 +37,9 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
+          # 关键：让 checkout 持久化的推送凭据用 PAT，而不是默认 GITHUB_TOKEN。
+          # 原版只把 PAT 给了 gh CLI，git push 仍走 GITHUB_TOKEN，照样会被 workflows 权限拒绝。
+          token: ${{ secrets.SYNC_TOKEN || github.token }}
 
       - name: Configure git
         run: |
@@ -50,24 +62,30 @@ jobs:
             echo "Upstream has new commits."
           fi
 
-      - name: Sync (merge or open sync PR)
+      - name: Sync (rebase or open sync PR)
         if: steps.check.outputs.has_updates == 'true'
         env:
-          # 优先用 PAT；未配置 SYNC_TOKEN 时回退到 GITHUB_TOKEN（仅够 push，无法创建 PR）
-          GH_TOKEN: ${{ secrets.SYNC_TOKEN || secrets.GITHUB_TOKEN }}
+          # 优先用 PAT；未配置 SYNC_TOKEN 时回退到 GITHUB_TOKEN
+          GH_TOKEN: ${{ secrets.SYNC_TOKEN || github.token }}
           HAS_PAT: ${{ secrets.SYNC_TOKEN != '' }}
         run: |
           set -uo pipefail
 
-          if git merge upstream/main --no-edit; then
-            echo "✅ Clean merge — pushing to main."
-            git push origin main
-            echo "::notice::Synced upstream to main successfully."
+          # 提前把最常见的失败讲清楚：上游动了 workflow 文件且没配 PAT，push 注定被拒。
+          if [ "$HAS_PAT" != "true" ] && ! git diff --quiet HEAD upstream/main -- .github/workflows; then
+            echo "::error::上游本次更新包含 .github/workflows 的改动，但未配置 SYNC_TOKEN(PAT)：默认 GITHUB_TOKEN 无 workflows 权限，push 必被拒绝。请先按本文件头部说明添加 SYNC_TOKEN 后重跑。"
+            exit 1
+          fi
+
+          if git rebase upstream/main; then
+            echo "✅ Clean rebase — pushing to main (force-with-lease)."
+            git push --force-with-lease origin main
+            echo "::notice::Synced upstream to main successfully (linear history, no merge commits)."
             exit 0
           fi
 
-          echo "⚠️ Merge conflicts — pushing sync-upstream branch for manual resolution."
-          git merge --abort
+          echo "⚠️ Rebase conflicts — pushing sync-upstream branch for manual resolution."
+          git rebase --abort
 
           SYNC_BRANCH="sync-upstream"
           git checkout -B "$SYNC_BRANCH" upstream/main
@@ -79,8 +97,9 @@ jobs:
               '' \
               '此 PR 由 `Sync Upstream` workflow 自动创建/刷新，用于把上游更新合入 `main`。' \
               '' \
-              '- 含有**需要手动解决冲突**的文件（常见于 `package.v2.json`、`traktcleaner` 等双方都改过的地方）。' \
-              '- 请在 GitHub 的 *Resolve conflicts* 界面处理后再合并。' \
+              '- 本 fork 的自有提交与上游改动产生了**需要手动解决的冲突**（常见于双方都改过的文件）。' \
+              '- 请在本地把自有提交 rebase 到本分支之上解决冲突，或在 GitHub 的 *Resolve conflicts* 界面处理。' \
+              '- 合并时请选 **Rebase and merge**，不要用普通 Merge，以免重新引入 Merge 提交、破坏线性历史。' \
               '- 合并后下一次定时检查将回到「干净自动同步」状态。' \
               > /tmp/pr-body.md
 
