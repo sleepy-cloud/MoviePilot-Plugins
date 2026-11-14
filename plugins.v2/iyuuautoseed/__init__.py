@@ -34,7 +34,7 @@ class IYUUAutoSeed(_PluginBase):
     # 插件图标
     plugin_icon = "IYUU.png"
     # 插件版本
-    plugin_version = "2.22"
+    plugin_version = "2.23"
     # 插件作者
     plugin_author = "jxxghp,CKun"
     # 作者主页
@@ -1335,8 +1335,13 @@ class IYUUAutoSeed(_PluginBase):
         def __is_hddolby(url: str):
             """
             判断是否为HDDolby站点
+            站点域名已由 hddolby.com 变更为 uhddolby.com，显式匹配新旧两个域名，
+            避免仅靠旧域名子串命中新域名
             """
-            return "hddolby.com" in (url or "").lower()
+            return any(
+                domain in (url or "").lower()
+                for domain in ("uhddolby.com", "hddolby.com")
+            )
 
         def __get_hddolby_torrent_url(tid: str, token: str):
             """
